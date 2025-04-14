@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from tensorflow.keras import optimizers
 
 # Momentum Method

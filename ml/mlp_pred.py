@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 from mlp import MLP, Layer
 from sklearn.utils import shuffle

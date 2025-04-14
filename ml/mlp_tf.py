@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import numpy as np
 from sklearn import datasets
 from sklearn.utils import shuffle
