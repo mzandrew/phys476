@@ -22,8 +22,13 @@ num_epochs = 100
 #mode = "halfmoons"
 mode = "realdata"
 num_classes = 3
+skim = 100
 
-epsilon = -0.000001
+epsilon = 0.001
+#epsilon_low = epsilon # this makes the accuracy 5% lower
+#epsilon_high = 1.0 - epsilon # this makes the accuracy 15% lower (in combination with epsilon_low = 0.001)
+epsilon_low = 0.0
+epsilon_high = 1.0
 random_seed = 123
 offset = 0.1
 batch_size = 10
@@ -36,10 +41,12 @@ num_color_gradations = 4
 if mode=="halfmoons":
 	index = [ 0, 1 ]
 if mode=="realdata":
-	#index = [ 8, 11, 17, 20, 23 ] # test_loss: 0.242, test_acc: 0.923 for 1000 epochs and 300, 30, 3
-	index = [ 8, 11 ] # test_loss: 0.056, test_acc: 0.985
+	#index = range(23)
+	index = [ 8, 11, 16, 17, 20, 23 ] # test_acc: 0.931
+	#index = [ 8, 11 ] # test_loss: 0.056, test_acc: 0.985
 	#index = [ 8, 17 ] # test_loss: 0.011, test_acc: 1.000; 1000 epochs: test_loss: 0.001, test_acc: 1.000
-	#index = [ 8, 17, 20 ]
+	#index = [ 8, 11, 17 ]
+	#index = [ 8, 17, 20, 23 ]
 	#index = [ 8, 20 ] # test_loss: 0.013, test_acc: 1.000
 	#index = [ 8, 23 ] # test_loss: 0.016, test_acc: 1.000
 	#index = [ 11, 17 ] # test_loss: 0.092, test_acc: 0.985
@@ -70,37 +77,54 @@ if __name__ == '__main__':
 	if mode=="realdata":
 		x = []; t = []
 		N = 0
+		M = 0
 		lines = 0
 		with open('train.csv') as csvfile:
 			dataset = csv.reader(csvfile)
 			for srow in dataset:
 				lines += 1
 				try:
-					frow = [ float(string) for string in srow ]
-					if epsilon<frow[-1]:
-#						print(', '.join(srow))
-						# 24 is the truth
-						# 8, 11, 17, 20, 23 are great for discerning type 1 from type 2
-						# 10 is good
-						# 9, 12, 15, 16, 19 are okay
-						# the rest are bad or marginal:
-						#0:1, 0:4, 0:5 diagonal line
-						#0:6, 0:7 horizontal line
-						#0:2, 0:3 expanding horn scatter plot
-						#0:13, 0:14, 0:18, 0:21, 0:22 is a rectangular scatter plot
-						mylist = []
-						for i in index:
-							mylist.append(frow[i])
+					frow = []
+					#frow = [ float(string) for string in srow ]
+					for string in srow:
+						try:
+							frow.append(float(string))
+						except:
+							frow.append(0.0)
+					truth = int(frow[-1])
+#					print(', '.join(srow))
+					# 24 is the truth
+					# 8, 11, 17, 20, 23 are great for discerning type 1 from type 2
+					# 10 is good
+					# 9, 12, 15, 16, 19 are okay
+					# the rest are bad or marginal:
+					#0:1, 0:4, 0:5 diagonal line
+					#0:6, 0:7 horizontal line
+					#0:2, 0:3 expanding horn scatter plot
+					#0:13, 0:14, 0:18, 0:21, 0:22 is a rectangular scatter plot
+					keeper = False
+					if N%skim==0:
+						keeper = True
+					mylist = []
+					for i in index:
+						mylist.append(frow[i])
+						if frow[i]<epsilon_low:
+							keeper = False
+						if epsilon_high<frow[i]:
+							keeper = False
+					one_hot = [ 0 for c in range(num_classes) ]
+					one_hot[truth] = 1
+					if keeper:
 						x.append(mylist)
-						one_hot = [ 0 for c in range(num_classes) ]
-						one_hot[int(frow[-1])] = 1
 						t.append(one_hot) # one_hot encoding for categorical_crossentropy
-						N += 1
+						M += 1
+					N += 1
 				except Exception as e:
-					#print("EXCEPTION: " + str(e))
-					pass
+					print("EXCEPTION: " + str(e))
+					#pass
 		print("file contains " + str(lines) + " lines")
 		print("successfully read " + str(N) + " entries")
+		print("using " + str(M) + " entries")
 		x = np.asarray(x)
 		t = np.asarray(t)
 		#for i in range(N):
@@ -113,17 +137,20 @@ if __name__ == '__main__':
 	if mode=="halfmoons":
 		model.add(Dense(num_classes, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
 	if mode=="realdata":
-		model.add(Dense(300, activation='sigmoid', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
-		model.add(Dense(30, activation='sigmoid', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
-		model.add(Dense(3, activation='sigmoid', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
+		#model.add(Dense(300, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
+		model.add(Dense(24, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
+		model.add(Dense(12, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
 		model.add(Dense(num_classes, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
 	''' 3. Model learning '''
 	optimizer = optimizers.SGD(learning_rate=0.1)
-	model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+	#optimizer = optimizers.Adam(learning_rate=0.1)
+	#model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+	model.compile(optimizer=optimizer, loss='mse', metrics=['accuracy']) # meansquarederror
+	#model.compile(optimizer=optimizer, loss='msle', metrics=['accuracy']) # meansquaredlogarithmicerror
 	model.fit(x_train, t_train, epochs=num_epochs, batch_size=batch_size, verbose=1)
 	''' 4. Model evaluation '''
 	loss, acc = model.evaluate(x_test, t_test, verbose=0)
-	print('test_loss: {:.3f}, test_acc: {:.3f}'.format(loss, acc))
+	print('test_acc: {:.3f}, test_loss: {:.3f}'.format(acc, loss))
 	#from keras_visualizer import visualizer # pip install keras-visualizer
 	#visualizer(model, file_format='png')
 	''' 5. Decision boundary plotting '''
@@ -174,4 +201,5 @@ if __name__ == '__main__':
 			png_filename = png_basename + str(index[i]) + "-" + str(index[j]) + ".png"
 			fig.savefig(png_filename)
 			print("wrote file " + png_filename)
+			plt.close()
 
