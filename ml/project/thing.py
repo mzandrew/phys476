@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # taken from mlp_keras.py written 2025 by keisuke yoshihara
 # modified 2025-04-10 by mza
-# last updated 2025-04-15 by mza
+# last updated 2025-04-17 by mza
 
 # https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
 # https://keras.io/api/losses/
@@ -18,11 +18,11 @@ from tensorflow.keras.losses import CategoricalCrossentropy
 import matplotlib.pyplot as plt
 import csv, sys
 
-num_epochs = 100
+num_epochs = 1000
 #mode = "halfmoons"
 mode = "realdata"
 num_classes = 3
-skim = 100
+skim = 1
 
 epsilon = 0.001
 #epsilon_low = epsilon # this makes the accuracy 5% lower
@@ -32,7 +32,6 @@ epsilon_high = 1.0
 random_seed = 123
 offset = 0.1
 batch_size = 10
-png_basename = "plotz."
 meshsteps = 200
 encoding = "onehot"
 cmap = [ 'Blues', 'Reds', 'Greens' ]
@@ -41,12 +40,18 @@ num_color_gradations = 4
 if mode=="halfmoons":
 	index = [ 0, 1 ]
 if mode=="realdata":
-	#index = range(23)
-	index = [ 8, 11, 16, 17, 20, 23 ] # test_acc: 0.931
-	#index = [ 8, 11 ] # test_loss: 0.056, test_acc: 0.985
+	#index = range(24) # adam100epochs acc=
+	#index = [ 8, 11 ] # test_loss: 0.056, test_acc: 0.985; adam100epochs acc=0.836
 	#index = [ 8, 17 ] # test_loss: 0.011, test_acc: 1.000; 1000 epochs: test_loss: 0.001, test_acc: 1.000
-	#index = [ 8, 11, 17 ]
-	#index = [ 8, 17, 20, 23 ]
+	#index = [ 8, 11, 17 ] # adam100epochs acc=0.847
+	#index = [ 8, 11, 17, 20 ] # adam100epochs acc=0.842
+	#index = [ 8, 11, 17, 20, 23 ] # adam100epochs acc=0.929
+	index = [ 8, 23, 17, 11, 16, 20 ] # SGD100epochs acc=0.931; adam100epochs acc=0.926; adam/mse/24-12-3/1000epochs acc=0.929
+	#index = [ 8, 11, 17, 23 ] # adam100epochs acc=0.929
+	#index = [ 11, 17, 23 ] # adam100epochs acc=0.897
+	#index = [ 8, 17, 23 ] # adam100epochs acc=0.926
+	#index = [ 17, 23 ] # adam100epochs acc=0.873
+	#index = [ 8, 23 ] # adam100epochs acc=0.918; adagrad100epochs acc=0.871; rmsprop100epochs acc=0.920; sgd100epochs acc=0.912; rmsprop/categorical_crossentropy/24-12-3/1000epochs acc=0.915
 	#index = [ 8, 20 ] # test_loss: 0.013, test_acc: 1.000
 	#index = [ 8, 23 ] # test_loss: 0.016, test_acc: 1.000
 	#index = [ 11, 17 ] # test_loss: 0.092, test_acc: 0.985
@@ -54,6 +59,7 @@ if mode=="realdata":
 	#index = [ 11, 23 ] # test_loss: 0.075, test_acc: 0.970
 	#index = [ 17, 20 ] # test_loss: 0.109, test_acc: 0.970
 	#index = [ 20, 23 ] # test_loss: 0.105, test_acc: 0.970
+print(str(index))
 
 if __name__ == '__main__':
 	np.random.seed(random_seed)
@@ -141,12 +147,16 @@ if __name__ == '__main__':
 		model.add(Dense(24, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
 		model.add(Dense(12, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
 		model.add(Dense(num_classes, activation='softmax', kernel_initializer=RandomNormal(mean=0.0, stddev=1.0, seed=random_seed), bias_initializer='zeros'))
+	architecture_string = "24softmax-12softmax-3softmax"
 	''' 3. Model learning '''
-	optimizer = optimizers.SGD(learning_rate=0.1)
-	#optimizer = optimizers.Adam(learning_rate=0.1)
-	#model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-	model.compile(optimizer=optimizer, loss='mse', metrics=['accuracy']) # meansquarederror
-	#model.compile(optimizer=optimizer, loss='msle', metrics=['accuracy']) # meansquaredlogarithmicerror
+	optimizer = optimizers.SGD(learning_rate=0.1); optimizer_string="sgd"
+	#optimizer = optimizers.Adagrad(learning_rate=0.01); optimizer_string="adagrad"
+	#optimizer = optimizers.RMSprop(learning_rate=0.001, rho=0.9); optimizer_string="rmsprop"
+	#optimizer = optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999); optimizer_string="adam"
+	#model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy']); loss_string="sparse_categorical_crossentropy" # ValueError: Argument `output` must have rank (ndim) `target.ndim - 1`. Received: target.shape=(None, 3), output.shape=(None, 3)
+	#model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy']); loss_string="categorical_crossentropy" # acc=0.922
+	model.compile(optimizer=optimizer, loss='mse', metrics=['accuracy']); loss_string="mse" # meansquarederror # acc=0.920
+	#model.compile(optimizer=optimizer, loss='msle', metrics=['accuracy']); loss_string="msle" # meansquaredlogarithmicerror acc=0.918
 	model.fit(x_train, t_train, epochs=num_epochs, batch_size=batch_size, verbose=1)
 	''' 4. Model evaluation '''
 	loss, acc = model.evaluate(x_test, t_test, verbose=0)
@@ -161,6 +171,8 @@ if __name__ == '__main__':
 		xmax.append(x[:,i].max() + offset)
 		x_span.append(np.linspace(xmin[i], xmax[i], meshsteps))
 	print("")
+	epochs_string = str(num_epochs) + "epochs"
+	png_basename = optimizer_string + "." + loss_string + "." + architecture_string + "." + epochs_string
 	for i in range(len(index)):
 		for j in range(len(index)):
 			if j<=i:
@@ -198,7 +210,7 @@ if __name__ == '__main__':
 			plt.ylabel(str(index[j]))
 			plt.legend()
 			#plt.show()
-			png_filename = png_basename + str(index[i]) + "-" + str(index[j]) + ".png"
+			png_filename = png_basename + "." + str(index[i]) + "-" + str(index[j]) + ".png"
 			fig.savefig(png_filename)
 			print("wrote file " + png_filename)
 			plt.close()
