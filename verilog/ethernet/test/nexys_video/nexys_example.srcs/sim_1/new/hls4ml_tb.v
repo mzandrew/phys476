@@ -37,6 +37,7 @@ hls4ml_wrapper uut_wrapper (
     .user_data_offset(data_offset),
     .user_data_write(data_write),
     .user_data_commit(data_commit),
+    .user_data_commit_len(data_commit_len),
     .user_data_free(1'b1),  // Assume always free in TB
     .hls4ml_input_data_flat(hls4ml_input_data_flat),
     .hls4ml_output_data_flat(hls4ml_output_data_flat),
@@ -86,13 +87,14 @@ wire [31:0] data_word;
 wire [9:0] data_offset;
 wire data_write;
 wire data_commit;
+wire [10:0] data_commit_len;
 
 always @(posedge clk) begin
     if (data_write) begin
         $display("Data write: offset=%d, word=%h", data_offset, data_word);
     end
     if (data_commit) begin
-        $display("Data commit triggered.");
+        $display("Data commit triggered. commit_len = %0d", data_commit_len);
     end
 end
 
